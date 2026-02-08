@@ -1,4 +1,7 @@
 # dino
+
+live link https://dino-iyig.onrender.com/
+
 DinoGems Wallet
 
 Simple wallet system built with Node.js + Supabase.
