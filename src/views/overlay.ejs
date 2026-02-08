@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>DinoGems Wallet</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Razorpay -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #064e3b, #022c22);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ecfdf5;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 420px;
+            padding: 28px;
+            border-radius: 18px;
+            background: rgba(16, 185, 129, 0.15);
+            backdrop-filter: blur(18px);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, .35);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        .balance {
+            text-align: center;
+            margin-bottom: 22px;
+        }
+
+        .balance span {
+            font-size: 36px;
+            font-weight: 700;
+            color: #34d399;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+            border: none;
+            background: rgba(0, 0, 0, .25);
+            color: #ecfdf5;
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: none;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #022c22;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #34d399, #16a34a);
+        }
+
+        .log {
+            margin-top: 10px;
+            font-size: 13px;
+            opacity: .9;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>🦖 DinoGems Wallet</h1>
+
+        <div class="balance">
+            Balance<br />
+            <span id="balance">--</span>
+        </div>
+
+        <input id="amount" type="number" placeholder="Amount in ₹" />
+
+        <button onclick="addBalance()">➕ Add Balance</button>
+        <button class="secondary" onclick="spend()">💸 Spend</button>
+
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        const USER_WALLET_ID = "<%= userWalletId %>";
+        const TREASURY_WALLET_ID = "<%= treasuryWalletId %>";
+        const RAZORPAY_KEY = "<%= razorpayKey %>";
+
+        async function fetchBalance() {
+            const res = await fetch(`/wallet/${USER_WALLET_ID}/balance`);
+            const data = await res.json();
+            document.getElementById('balance').innerText = data.balance;
+        }
+
+        async function addBalance() {
+            const amount = Number(document.getElementById('amount').value);
+            if (!amount || amount <= 0) return log('Enter valid amount');
+
+            log('Creating payment order...');
+
+            const orderRes = await fetch('/payment/create-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount,
+                    userWalletId: USER_WALLET_ID,
+                    treasuryWalletId: TREASURY_WALLET_ID
+                })
+            });
+
+            const order = await orderRes.json();
+
+            const rzp = new Razorpay({
+                key: RAZORPAY_KEY,
+                amount: order.amount, // paise (from backend)
+                currency: "INR",
+                order_id: order.id,
+                handler: async function (response) {
+                    log('Verifying payment...');
+
+                    const verifyRes = await fetch('/payment/verify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            paymentId: response.razorpay_payment_id,
+                            amount,
+                            userWalletId: USER_WALLET_ID,
+                            treasuryWalletId: TREASURY_WALLET_ID
+                        })
+                    });
+
+                    const result = await verifyRes.json();
+
+                    if (result.status === 'SUCCESS') {
+                        log('✅ Wallet credited successfully');
+                        await fetchBalance();
+                    } else {
+                        log('❌ Payment verification failed');
+                    }
+                }
+            });
+
+            rzp.open();
+        }
+
+        async function spend() {
+            const amount = Number(document.getElementById('amount').value);
+            if (!amount || amount <= 0) return log('Enter valid amount');
+
+            const res = await fetch('/wallet/spend', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount,
+                    userWalletId: USER_WALLET_ID,
+                    treasuryWalletId: TREASURY_WALLET_ID
+                })
+            });
+
+            const data = await res.json();
+            log(data.status || data.error);
+            fetchBalance();
+        }
+
+        function log(msg) {
+            document.getElementById('log').innerText = msg;
+        }
+
+        fetchBalance();
+    </script>
+</body>
+
+</html>

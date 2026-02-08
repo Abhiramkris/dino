@@ -1,0 +1,50 @@
+{
+  "name": "dinogems-wallet-service",
+  "version": "1.0.0",
+  "description": "DinoGems – High concurrency internal wallet & ledger service",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "lint": "echo \"lint not configured\"",
+    "worker": "node scripts/start.worker.js",
+    "stress:system": "node scripts/stress.system.js"
+  },
+  "author": "Abhiram Krishna",
+  "license": "ISC",
+  "keywords": [
+    "wallet",
+    "ledger",
+    "supabase",
+    "razorpay",
+    "nodejs",
+    "transactions",
+    "idempotency"
+  ],
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
+    "dotenv": "^17.2.4",
+    "ejs": "^4.0.1",
+    "express": "^5.2.1",
+    "pino": "^10.3.0",
+    "razorpay": "^2.9.6",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.11",
+    "supertest": "^6.3.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFiles": [
+      "<rootDir>/tests/jest.setup.js"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
+  }
+}
