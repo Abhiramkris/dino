@@ -10,26 +10,26 @@ if (!fs.existsSync(BUFFER_DIR)) {
 /**
  * Write transaction to disk (O(1))
  */
-// function writeToBuffer(payload) {
-//   const fileName = `tx_${payload.transactionId}.json`;
-//   const filePath = path.join(BUFFER_DIR, fileName);
-
-//   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
-// }
-
 function writeToBuffer(payload) {
-    if (!payload.transactionId) {
-        throw new Error('transactionId required for buffer');
-    }
+  const fileName = `tx_${payload.transactionId}.json`;
+  const filePath = path.join(BUFFER_DIR, fileName);
 
-    const fileName = `tx_${payload.transactionId}.json`;
-    const filePath = path.join(BUFFER_DIR, fileName);
-
-    // idempotent disk write
-    if (!fs.existsSync(filePath)) {
-        fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
-    }
+  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
 }
+
+// function writeToBuffer(payload) {
+//     if (!payload.transactionId) {
+//         throw new Error('transactionId required for buffer');
+//     }
+
+//     const fileName = `tx_${payload.transactionId}.json`;
+//     const filePath = path.join(BUFFER_DIR, fileName);
+
+//     // idempotent disk write
+//     if (!fs.existsSync(filePath)) {
+//         fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
+//     }
+// }
 
 
 /**
