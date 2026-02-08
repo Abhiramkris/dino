@@ -90,7 +90,8 @@ router.post('/topup', async (req, res) => {
             userWalletId,
             treasuryWalletId,
             amount,
-            transactionId
+            transactionId,
+            isExternalMint: true
         });
 
         res.json(result);

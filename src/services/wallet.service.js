@@ -2,7 +2,7 @@ const supabase = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
 
 /**
- * Get wallet balance using ledger (O(1) with index)
+ * Get wallet balance using ledger
  */
 async function getWalletBalance(walletId) {
   const { data, error } = await supabase
@@ -21,18 +21,20 @@ async function getWalletBalance(walletId) {
  * - idempotency
  * - locking
  * - ledger writes
+ * - optional balance skipping (external mint)
  */
 async function executeTransaction({
   transactionId,
   fromWalletId,
   toWalletId,
   amount,
-  type
+  type,
+  skipBalanceCheck = false
 }) {
-  // 1️⃣ Check idempotency
+  // 1️⃣ Idempotency check
   const { data: existingTx } = await supabase
     .from('transactions')
-    .select('*')
+    .select('id')
     .eq('id', transactionId)
     .single();
 
@@ -40,29 +42,27 @@ async function executeTransaction({
     return { status: 'IDEMPOTENT_SUCCESS' };
   }
 
-  // 2️⃣ Begin transaction
-  const client = supabase.rpc;
-
   try {
-    // Insert transaction record
+    // 2️⃣ Create transaction record
     await supabase.from('transactions').insert({
       id: transactionId,
       status: 'PENDING'
     });
 
-    // 3️⃣ Lock FROM wallet
-    const { data: fromWallet } = await supabase.rpc(
-      'lock_wallet',
-      { wallet_id: fromWalletId }
-    );
+    // 3️⃣ Lock FROM wallet (row-level lock)
+    await supabase.rpc('lock_wallet', {
+      wallet_id: fromWalletId
+    });
 
-    // 4️⃣ Balance check
-    const balance = await getWalletBalance(fromWalletId);
-    if (balance < amount) {
-      throw new Error('INSUFFICIENT_BALANCE');
+    // 4️⃣ Balance check (skip for external mint)
+    if (!skipBalanceCheck) {
+      const balance = await getWalletBalance(fromWalletId);
+      if (balance < amount) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
     }
 
-    // 5️⃣ Ledger entries
+    // 5️⃣ Ledger entries (atomic intent)
     await supabase.from('ledger_entries').insert([
       {
         wallet_id: fromWalletId,
@@ -78,7 +78,6 @@ async function executeTransaction({
       }
     ]);
 
-    // 6️⃣ Mark transaction success
     await supabase
       .from('transactions')
       .update({ status: 'SUCCESS' })
@@ -86,6 +85,7 @@ async function executeTransaction({
 
     return { status: 'SUCCESS' };
   } catch (err) {
+
     await supabase
       .from('transactions')
       .update({ status: 'FAILED' })
@@ -95,26 +95,31 @@ async function executeTransaction({
   }
 }
 
-/**
- * Public APIs
- */
 async function spend({ userWalletId, treasuryWalletId, amount }) {
   return executeTransaction({
     transactionId: uuidv4(),
     fromWalletId: userWalletId,
     toWalletId: treasuryWalletId,
     amount,
-    type: 'SPEND'
+    type: 'SPEND',
+    skipBalanceCheck: false
   });
 }
 
-async function topup({ userWalletId, treasuryWalletId, amount, transactionId }) {
+async function topup({
+  userWalletId,
+  treasuryWalletId,
+  amount,
+  transactionId,
+  isExternalMint = true
+}) {
   return executeTransaction({
     transactionId,
     fromWalletId: treasuryWalletId,
     toWalletId: userWalletId,
     amount,
-    type: 'TOPUP'
+    type: 'TOPUP',
+    skipBalanceCheck: isExternalMint
   });
 }
 
@@ -124,7 +129,8 @@ async function bonus({ userWalletId, treasuryWalletId, amount }) {
     fromWalletId: treasuryWalletId,
     toWalletId: userWalletId,
     amount,
-    type: 'BONUS'
+    type: 'BONUS',
+    skipBalanceCheck: false
   });
 }
 
