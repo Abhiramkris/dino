@@ -61,101 +61,44 @@ router.post('/create-order', async (req, res) => {
  *   amount
  * }
  */
-// router.post('/verify', async (req, res) => {
-//     try {
-//         const { paymentId, userWalletId, treasuryWalletId, amount } = req.body;
-
-//         if (!paymentId || !amount) {
-//             return res.status(400).json({ error: 'Missing paymentId or amount' });
-//         }
-
-//         // Fetch payment details from Razorpay
-//         const payment = await razorpay.payments.fetch(paymentId);
-
-//         // 1️⃣ Verify payment status
-//         if (payment.status !== 'captured') {
-//             return res.status(400).json({
-//                 error: 'Payment not captured',
-//                 status: payment.status
-//             });
-//         }
-
-//         // 2️⃣ Verify amount (paise → rupees)
-//         const paidAmount = payment.amount / 100;
-//         if (paidAmount !== Number(amount)) {
-//             return res.status(400).json({ error: 'Amount mismatch' });
-//         }
-
-//         // 3️⃣ Credit wallet (idempotent)
-//         await topup({
-//             userWalletId,
-//             treasuryWalletId,
-//             amount: Number(amount),          // rupees
-//             transactionId: payment.id        // VERY IMPORTANT
-//         });
-
-//         res.json({ status: 'SUCCESS' });
-
-//     } catch (err) {
-//         res.status(500).json({ error: err.message });
-//     }
-// });
-
 router.post('/verify', async (req, res) => {
-  try {
-    console.log('VERIFY BODY:', req.body);
+    try {
+        const { paymentId, userWalletId, treasuryWalletId, amount } = req.body;
 
-    const { paymentId, amount, userWalletId, treasuryWalletId } = req.body;
+        if (!paymentId || !amount) {
+            return res.status(400).json({ error: 'Missing paymentId or amount' });
+        }
 
-    if (!paymentId) {
-      console.error('❌ paymentId missing');
-      return res.status(400).json({ error: 'paymentId missing' });
+        // Fetch payment details from Razorpay
+        const payment = await razorpay.payments.fetch(paymentId);
+
+        // 1️⃣ Verify payment status
+        if (payment.status !== 'captured') {
+            return res.status(400).json({
+                error: 'Payment not captured',
+                status: payment.status
+            });
+        }
+
+        // 2️⃣ Verify amount (paise → rupees)
+        const paidAmount = payment.amount / 100;
+        if (paidAmount !== Number(amount)) {
+            return res.status(400).json({ error: 'Amount mismatch' });
+        }
+
+        // 3️⃣ Credit wallet (idempotent)
+        await topup({
+            userWalletId,
+            treasuryWalletId,
+            amount: Number(amount),          // rupees
+            transactionId: payment.id        // VERY IMPORTANT
+        });
+
+        res.json({ status: 'SUCCESS' });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-
-    const payment = await razorpay.payments.fetch(paymentId);
-
-    console.log('RAZORPAY PAYMENT:', {
-      id: payment.id,
-      status: payment.status,
-      amount: payment.amount,
-      currency: payment.currency
-    });
-
-    // status check
-    if (payment.status !== 'captured') {
-      console.error('❌ Payment not captured:', payment.status);
-      return res.status(400).json({
-        error: 'Payment not captured',
-        status: payment.status
-      });
-    }
-
-    const paidRupees = payment.amount / 100;
-    console.log('AMOUNT CHECK:', {
-      paidRupees,
-      requestedAmount: Number(amount)
-    });
-
-    if (paidRupees !== Number(amount)) {
-      console.error('❌ Amount mismatch');
-      return res.status(400).json({ error: 'Amount mismatch' });
-    }
-
-    await topup({
-      transactionId: payment.id,
-      userWalletId,
-      treasuryWalletId,
-      amount: Number(amount)
-    });
-
-    console.log('✅ WALLET CREDITED');
-
-    res.json({ status: 'SUCCESS' });
-
-  } catch (err) {
-    console.error('❌ VERIFY ERROR:', err);
-    res.status(500).json({ error: err.message });
-  }
 });
 
 

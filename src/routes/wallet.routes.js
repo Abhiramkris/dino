@@ -36,24 +36,40 @@ router.get('/:walletId/balance', async (req, res) => {
  *   amount
  * }
  * 
- */router.post('/spend', async (req, res) => {
+ */
+router.post('/spend', async (req, res) => {
     try {
         const result = await spend(req.body);
-        res.json(result);
+        return res.json(result);
+
     } catch (err) {
+        console.error('SPEND ERROR:', err.message);
+
+        if (err.message === 'INSUFFICIENT_BALANCE') {
+            return res.status(400).json({
+                error: 'INSUFFICIENT_BALANCE'
+            });
+        }
+
         if (process.env.ENABLE_BUFFER_MODE === 'true') {
             writeToBuffer({
                 action: 'SPEND',
-                transactionId: Date.now().toString(),
+                transactionId: req.body.transactionId || Date.now().toString(),
                 ...req.body
             });
 
-            return res.status(202).json({ status: 'BUFFERED' });
+            return res.status(202).json({
+                status: 'PENDING',
+                message: 'System under load. Transaction queued.'
+            });
         }
 
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({
+            error: 'SYSTEM_ERROR'
+        });
     }
 });
+
 
 /**
  * POST /wallet/bonus
